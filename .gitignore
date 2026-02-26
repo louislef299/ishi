@@ -1,0 +1,3 @@
+data/
+zig-out/
+.zig-cache/

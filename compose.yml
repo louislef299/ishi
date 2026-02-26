@@ -1,0 +1,13 @@
+---
+services:
+  db:
+    image: pgvector/pgvector:pg18-trixie
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: pgv
+    volumes:
+    - ./data:/var/lib/postgresql
+    ports:
+    - 5432:5432
+
