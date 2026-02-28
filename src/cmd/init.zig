@@ -11,9 +11,8 @@ pub fn create(app: *yazap.App) !yazap.Command {
 }
 
 pub fn run(m: *const yazap.ArgMatches) !void {
-    if (m.getSingleValue("target")) |target| {
-        std.debug.print("target: {s}\n", .{target});
-    } else {
-        std.debug.print("target: (none)\n", .{});
-    }
+    // -t || --target
+    const target = m.getSingleValue("target") orelse "localhost";
+
+    std.debug.print("target: {s}\n", .{target});
 }
