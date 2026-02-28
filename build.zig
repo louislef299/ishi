@@ -15,10 +15,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // zig fetch --save git+https://github.com/prajwalch/yazap
-    const yazap = b.dependency("yazap", .{});
-    exe.root_module.addImport("yazap", yazap.module("yazap"));
-
     const pg = b.dependency("pg", .{}).module("pg");
     exe.root_module.addImport("pg", pg);
 

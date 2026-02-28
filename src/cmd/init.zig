@@ -1,18 +1,24 @@
 const std = @import("std");
-const yazap = @import("yazap");
+const pg = @import("pg");
 
-pub fn create(app: *yazap.App) !yazap.Command {
-    var cmd_init = app.createCommand(
-        "init",
-        "Initialize the pg database with pgvector",
-    );
-    try cmd_init.addArg(yazap.Arg.singleValueOption("target", 't', "The name of the target db hostname"));
-    return cmd_init;
-}
+pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    var target: []const u8 = "localhost";
+    var i: usize = 0;
+    while (i < args.len) : (i += 1) {
+        if (std.mem.eql(u8, args[i], "--target") or std.mem.eql(u8, args[i], "-t")) {
+            if (i + 1 < args.len) {
+                target = args[i + 1];
+                i += 1;
+            }
+        }
+    }
 
-pub fn run(m: *const yazap.ArgMatches) !void {
-    // -t || --target
-    const target = m.getSingleValue("target") orelse "localhost";
+    var pool = try pg.Pool.init(allocator, .{
+        .size = 1,
+        .connect = .{ .host = target, .port = 5432 },
+        .auth = .{ .username = "postgres", .password = "pgv", .database = "postgres" },
+    });
+    defer pool.deinit();
 
-    std.debug.print("target: {s}\n", .{target});
+    std.debug.print("connected to {s}\n", .{target});
 }
