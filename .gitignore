@@ -1,3 +1,5 @@
 data/
 zig-out/
 .zig-cache/
+bin/
+zig-pkg/

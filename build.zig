@@ -1,5 +1,7 @@
 const std = @import("std");
 
+// protip: run zig build --fetch if you don't have some of the remote deps for
+// this project
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -12,6 +14,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+
+    // zig fetch --save git+https://github.com/prajwalch/yazap
+    const yazap = b.dependency("yazap", .{});
+    exe.root_module.addImport("yazap", yazap.module("yazap"));
 
     b.installArtifact(exe);
 

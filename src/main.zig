@@ -1,21 +1,25 @@
 // https://ziglang.org/documentation/0.15.2/std
 const std = @import("std");
+const yazap = @import("yazap");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
+const App = yazap.App;
 
-    var buf: [1024]u8 = undefined;
-    var stdW = std.fs.File.stdout().writer(&buf);
-    const stdout = &stdW.interface;
+// https://codeberg.org/ziglang/zig/pulls/30644
+pub fn main(init: std.process.Init) !void {
+    var app = App.init(init.gpa, "pgv", "My pgvector tool");
+    defer app.deinit();
 
-    var args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var pgv = app.rootCommand();
+    pgv.setProperty(.help_on_empty_args);
 
-    for (args[1..]) |arg| {
-        try stdout.print("{s} ", .{arg});
+    try pgv.addSubcommand(app.createCommand(
+        "init",
+        "Initialize the pg database with pgvector",
+    ));
+
+    const matches = try app.parseProcess(init.io, init.minimal.args);
+    if (matches.containsArg("init")) {
+        std.debug.print("Initilize pg database", .{});
+        return;
     }
-    try stdout.print("\n", .{});
-    try stdout.flush();
 }
