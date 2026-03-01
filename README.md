@@ -3,8 +3,6 @@
 A small Zig CLI that demonstrates semantic search using pgvector and
 locally-generated embeddings.
 
-`opencode -s ses_3656db99cffeZohVlvVNe3bTKP`
-
 ## What it does
 
 1. Takes ~20-30 hardcoded text snippets (descriptions of project types, tools,
