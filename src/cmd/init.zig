@@ -1,7 +1,8 @@
 const std = @import("std");
 const pg = @import("pg");
-const lib = @import("../log.zig");
 const flags = @import("flags.zig");
+const lib = @import("../log.zig");
+const models = @import("../models.zig");
 
 // InitFlags defines the supported CLI flags for the init command.
 // Each field name corresponds to a --flag name and its default value
@@ -11,18 +12,27 @@ const InitFlags = struct {
     password: []const u8 = "pgv",
     database: []const u8 = "postgres",
     target: []const u8 = "localhost",
+    model: []const u8 = "nomic-embed-text",
 
     pub const descriptions = struct {
         pub const username = "Username used to connect to the postgres database";
         pub const password = "Password used to connect to the postgres database";
         pub const database = "Target postgres database to connect to";
         pub const target = "Network address of the postgres database";
+        pub const model = "Ollama embedding model to configure the vector column for";
     };
 };
 
 pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var f = InitFlags{};
     try flags.parse(&f, args);
+
+    // Validate the model before spending time on a connection.
+    const model = models.find(f.model) orelse {
+        lib.log.err("Unknown model '{s}'. Supported models:", .{f.model});
+        for (models.ollama) |m| lib.log.err("  {s}", .{m.name});
+        std.posix.exit(1);
+    };
 
     var pool = pg.Pool.init(allocator, .{
         .size = 1,
@@ -34,9 +44,18 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     };
     defer pool.deinit();
 
-    std.debug.print("connected to {s}!\n", .{f.target});
+    _ = try pool.exec("CREATE EXTENSION IF NOT EXISTS vector;", .{});
 
-    _ = try pool.exec("CREATE EXTENSION vector;", .{});
-    _ = try pool.exec("CREATE TABLE items (id bigserial PRIMARY KEY, embedding vector(3));", .{});
-    _ = try pool.exec("INSERT INTO items (embedding) VALUES ('[1,2,3]'), ('[4,5,6]');", .{});
+    // DDL cannot use query parameters — build the SQL on the stack.
+    var buf: [256]u8 = undefined;
+    const create_table = try std.fmt.bufPrint(
+        &buf,
+        "CREATE TABLE IF NOT EXISTS items (id bigserial PRIMARY KEY, embedding vector({d}));",
+        .{model.dims},
+    );
+    _ = try pool.exec(create_table, .{});
+
+    std.debug.print("initialized '{s}' for model '{s}' ({d} dims)\n", .{
+        f.target, model.name, model.dims,
+    });
 }
