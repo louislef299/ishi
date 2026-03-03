@@ -1,0 +1,34 @@
+[
+  {
+    "id": "zig-comptime",
+    "text": "Zig evaluates generic functions at compile time using comptime parameters, enabling type-safe metaprogramming without runtime overhead."
+  },
+  {
+    "id": "pgvector-intro",
+    "text": "pgvector is an open-source PostgreSQL extension for storing and querying vector embeddings, supporting exact and approximate nearest neighbor search."
+  },
+  {
+    "id": "cosine-similarity",
+    "text": "Cosine similarity measures the angle between two vectors, ranging from -1 to 1. It is commonly used to compare text embeddings regardless of magnitude."
+  },
+  {
+    "id": "ollama-overview",
+    "text": "Ollama is a tool for running large language models locally. It supports embedding models like nomic-embed-text and mxbai-embed-large for generating vector representations of text."
+  },
+  {
+    "id": "hnsw-index",
+    "text": "HNSW is a graph-based approximate nearest neighbor algorithm that provides fast query performance with a tunable speed-recall tradeoff via the ef_search parameter."
+  },
+  {
+    "id": "embedding-dims",
+    "text": "The dimensionality of an embedding vector is fixed by the model that produced it. nomic-embed-text outputs 768 dimensions, while mxbai-embed-large outputs 1024."
+  },
+  {
+    "id": "zig-error-handling",
+    "text": "Zig uses explicit error unions and the try keyword for error propagation. There are no exceptions — errors are values that must be handled or propagated by the caller."
+  },
+  {
+    "id": "postgres-extensions",
+    "text": "PostgreSQL supports extensions that add functionality beyond the core database. Extensions like pgvector, PostGIS, and pg_trgm are installed with CREATE EXTENSION."
+  }
+]
