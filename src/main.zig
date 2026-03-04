@@ -1,7 +1,7 @@
 const std = @import("std");
 const pg = @import("pg");
 const flags = @import("cmd/flags.zig");
-const lib = @import("log.zig");
+const lib = @import("lib/log.zig");
 const init_cmd = @import("cmd/init.zig");
 const seed_cmd = @import("cmd/seed.zig");
 

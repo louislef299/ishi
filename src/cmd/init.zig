@@ -1,8 +1,8 @@
 const std = @import("std");
 const pg = @import("pg");
 const flags = @import("flags.zig");
-const lib = @import("../log.zig");
-const models = @import("../models.zig");
+const lib = @import("../lib/log.zig");
+const models = @import("../lib/models.zig");
 
 // InitFlags defines the supported CLI flags for the init command.
 // Each field name corresponds to a --flag name and its default value
