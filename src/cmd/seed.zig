@@ -75,6 +75,7 @@ fn getEmbedding(allocator: std.mem.Allocator, model_name: []const u8, text: []co
     defer allocator.free(body);
 
     // Shell out to curl to call the Ollama embedding API.
+    // TODO: replace with zul.http.Client(https://www.goblgobl.com/zul/http/client/)
     const result = try std.process.Child.run(.{
         .allocator = allocator,
         .argv = &.{
