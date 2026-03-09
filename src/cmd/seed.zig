@@ -17,6 +17,7 @@ const SeedFlags = struct {
     model: []const u8 = "nomic-embed-text",
     path: []const u8 = "./seed.json",
 
+    pub const summary = "Seeds the configured pgvector database with json data";
     pub const descriptions = struct {
         pub const model = "Ollama embedding model to generate embeddings with";
         pub const path = "Path to the JSON seed file";
@@ -25,7 +26,7 @@ const SeedFlags = struct {
 
 pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, args: []const []const u8) !void {
     var f = SeedFlags{};
-    try flags.parse(&f, args);
+    try flags.parse(allocator, &f, args);
 
     _ = models.find(f.model) orelse {
         lib.log.err("Unknown model '{s}'. Supported models:", .{f.model});

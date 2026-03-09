@@ -15,9 +15,9 @@ const InitFlags = struct {
     };
 };
 
-pub fn run(_: std.mem.Allocator, pool: *pg.Pool, args: []const []const u8) !void {
+pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, args: []const []const u8) !void {
     var f = InitFlags{};
-    try flags.parse(&f, args);
+    try flags.parse(allocator, &f, args);
 
     // Validate the model before running DDL.
     const model = models.find(f.model) orelse {

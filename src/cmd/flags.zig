@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const help_flag = "help";
+
 // parse populates a command's flags struct from a slice of CLI args.
 //
 // `flags` is a pointer to any struct whose fields represent the supported
@@ -12,7 +14,7 @@ const std = @import("std");
 // monomorphized (compiled separately) for each flags struct that uses it.
 //
 // Only `--flag value` style is supported (no short flags, no `--flag=value`).
-pub fn parse(flags: anytype, args: []const []const u8) !void {
+pub fn parse(_: std.mem.Allocator, flags: anytype, args: []const []const u8) !void {
     // Capture the concrete type of the dereferenced pointer (e.g. InitFlags).
     // This is needed so std.meta.fields can inspect its fields at comptime.
     const T = @TypeOf(flags.*);
@@ -27,6 +29,11 @@ pub fn parse(flags: anytype, args: []const []const u8) !void {
             arg[2..]
         else
             continue;
+
+        if (std.mem.eql(u8, name, help_flag)) {
+            try help(flags);
+            std.posix.exit(1);
+        }
 
         // `inline for` unrolls this loop at comptime over the struct's fields.
         // At runtime it behaves like a chain of if/else checks, but the field
@@ -47,8 +54,17 @@ pub fn parse(flags: anytype, args: []const []const u8) !void {
 
 // Grab the nested description string for each flag and print it to the screen
 // TODO: actually implement the help trigger logic
-pub fn help(flags: anytype) void {
+pub fn help(flags: anytype) !void {
     const T = @TypeOf(flags.*);
+
+    const usage =
+        \\{s}
+        \\
+        \\Usage: git ishi <command> [options]
+        \\
+        \\Commands:
+    ;
+    std.debug.print(usage, .{"tmp"});
 
     inline for (std.meta.fields(T)) |field| {
         if (@hasDecl(T, "descriptions")) {

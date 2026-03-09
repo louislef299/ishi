@@ -44,7 +44,7 @@ pub fn main() !void {
     };
 
     var gf = GlobalFlags{};
-    try flags.parse(&gf, args[2..]);
+    try flags.parse(allocator, &gf, args[2..]);
 
     var pool = pg.Pool.init(allocator, .{
         .size = 1,
