@@ -1,4 +1,5 @@
 // https://www.openmymind.net/Zig-Interfaces/
+// https://www.bradcypert.com/interfaces-in-zig/
 
 const std = @import("std");
 
