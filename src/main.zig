@@ -5,18 +5,20 @@ const lib = @import("lib/log.zig");
 const init_cmd = @import("cmd/init.zig");
 const seed_cmd = @import("cmd/seed.zig");
 
-// GlobalFlags defines connection flags shared across all commands.
-const GlobalFlags = struct {
+// Flags defines all CLI flags shared across commands.
+pub const Flags = struct {
     target: []const u8 = "localhost",
     username: []const u8 = "postgres",
     password: []const u8 = "ishi",
     database: []const u8 = "postgres",
+    model: []const u8 = "nomic-embed-text",
+    path: []const u8 = "./seed.json",
 };
 
 pub const usage =
     \\ishi - pgvector storage for git intelligence
     \\
-    \\Usage: git ishi <command> [options]
+    \\Usage: git ishi <command> [flags]
     \\
     \\Commands:
     \\  init    Initialize the pg database with pgvector
@@ -39,21 +41,21 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    var gf = GlobalFlags{};
-    const cmd = try flags.parse(usage, &gf, args[0..]);
+    var f = Flags{};
+    const cmd = try flags.parse(usage, &f, args[0..]);
 
     var pool = pg.Pool.init(allocator, .{
         .size = 1,
-        .connect = .{ .host = gf.target, .port = 5432 },
-        .auth = .{ .username = gf.username, .password = gf.password, .database = gf.database },
+        .connect = .{ .host = f.target, .port = 5432 },
+        .auth = .{ .username = f.username, .password = f.password, .database = f.database },
     }) catch |err| {
-        lib.log.err("Failed to connect to {s}: {}", .{ gf.target, err });
+        lib.log.err("Failed to connect to {s}: {}", .{ f.target, err });
         std.posix.exit(1);
     };
     defer pool.deinit();
 
     switch (cmd) {
-        .init => try init_cmd.run(allocator, pool, args[2..]),
-        .seed => try seed_cmd.run(allocator, pool, args[2..]),
+        .init => try init_cmd.run(allocator, pool, f),
+        .seed => try seed_cmd.run(allocator, pool, f),
     }
 }

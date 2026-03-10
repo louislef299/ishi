@@ -1,6 +1,5 @@
 const std = @import("std");
 const pg = @import("pg");
-const flags = @import("flags.zig");
 const lib = @import("../lib/log.zig");
 const models = @import("../lib/models.zig");
 
@@ -15,15 +14,7 @@ const OllamaResponse = struct {
     embedding: []f64,
 };
 
-const SeedFlags = struct {
-    model: []const u8 = "nomic-embed-text",
-    path: []const u8 = "./seed.json",
-};
-
-pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, args: []const []const u8) !void {
-    var f = SeedFlags{};
-    flags.parseFlags(root.usage, &f, args);
-
+pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, f: root.Flags) !void {
     _ = models.find(f.model) orelse {
         lib.log.err("Unknown model '{s}'. Supported models:", .{f.model});
         for (models.ollama) |m| lib.log.err("  {s}", .{m.name});

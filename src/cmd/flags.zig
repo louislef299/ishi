@@ -79,36 +79,6 @@ pub fn parse(usage: []const u8, flags: anytype, args: []const []const u8) !IshiC
     return tgt_cmd;
 }
 
-// parseFlags populates a flags struct from CLI args without command dispatch.
-// Used by subcommands that only need flag parsing (no subcommand resolution).
-pub fn parseFlags(usage: []const u8, flags: anytype, args: []const []const u8) void {
-    const T = @TypeOf(flags.*);
-
-    var i: usize = 0;
-    while (i < args.len) : (i += 1) {
-        const arg = args[i];
-
-        const name = if (std.mem.startsWith(u8, arg, "--"))
-            arg[2..]
-        else
-            continue;
-
-        if (std.mem.eql(u8, name, help_flag)) {
-            help(usage);
-            std.posix.exit(0);
-        }
-
-        inline for (std.meta.fields(T)) |field| {
-            if (std.mem.eql(u8, name, field.name)) {
-                if (i + 1 < args.len) {
-                    @field(flags.*, field.name) = args[i + 1];
-                    i += 1;
-                }
-            }
-        }
-    }
-}
-
 fn help(usage: []const u8) void {
     std.debug.print("{s}\n", .{usage});
 }
