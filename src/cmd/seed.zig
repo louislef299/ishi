@@ -26,7 +26,13 @@ const SeedFlags = struct {
 
 pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, args: []const []const u8) !void {
     var f = SeedFlags{};
-    try flags.parse(allocator, &f, args);
+    _ = try flags.parse(.{
+        .usage = "seed",
+        .description =
+        \\Provide a path to a JSON configuration to seed the pgvector database
+        \\with embeddings. The JSON schema should be a list of { id, text }.
+        ,
+    }, &f, args);
 
     _ = models.find(f.model) orelse {
         lib.log.err("Unknown model '{s}'. Supported models:", .{f.model});

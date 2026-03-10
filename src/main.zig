@@ -5,17 +5,6 @@ const lib = @import("lib/log.zig");
 const init_cmd = @import("cmd/init.zig");
 const seed_cmd = @import("cmd/seed.zig");
 
-const usage =
-    \\ishi - git intelligence, from within
-    \\
-    \\Usage: git ishi <command> [options]
-    \\
-    \\Commands:
-    \\  init    Initialize the pg database with pgvector
-    \\  seed    Seed the pg database with embeddings
-    \\
-;
-
 // GlobalFlags defines connection flags shared across all commands.
 const GlobalFlags = struct {
     target: []const u8 = "localhost",
@@ -23,6 +12,19 @@ const GlobalFlags = struct {
     password: []const u8 = "ishi",
     database: []const u8 = "postgres",
 };
+
+const usage =
+    \\ishi - pgvector storage for git intelligence
+    \\
+    \\Usage: git ishi <command> [options]
+    \\
+    \\Commands:
+    \\  init    Initialize the pg database with pgvector
+    \\  seed    Seed the pg database with embeddings
+    \\
+    \\Flags:
+    \\
+;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -32,19 +34,15 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len < 2) {
-        std.debug.print(usage, .{});
-        return;
-    }
-
-    const Cmd = enum { init, seed };
-    const cmd = std.meta.stringToEnum(Cmd, args[1]) orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
-
     var gf = GlobalFlags{};
-    try flags.parse(allocator, &gf, args[2..]);
+    const cmd = try flags.parse(.{
+        .description = "ishi - git intelligence, from within",
+        .usage = "git ishi <command> [options]",
+        .subcommands = &[_][]const u8{
+            "init    Initialize the pg database with pgvector",
+            "seed    Seed the pg database with embeddings",
+        },
+    }, &gf, args[0..]);
 
     var pool = pg.Pool.init(allocator, .{
         .size = 1,

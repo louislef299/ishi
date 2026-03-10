@@ -2,6 +2,16 @@ const std = @import("std");
 
 const help_flag = "help";
 
+const IshiCmd = enum {
+    init,
+    seed,
+};
+pub const Cmd = struct {
+    description: []const u8,
+    usage: []const u8,
+    subcommands: ?[]const []const u8 = null,
+};
+
 // parse populates a command's flags struct from a slice of CLI args.
 //
 // `flags` is a pointer to any struct whose fields represent the supported
@@ -14,7 +24,18 @@ const help_flag = "help";
 // monomorphized (compiled separately) for each flags struct that uses it.
 //
 // Only `--flag value` style is supported (no short flags, no `--flag=value`).
-pub fn parse(_: std.mem.Allocator, flags: anytype, args: []const []const u8) !void {
+pub fn parse(cmd: Cmd, flags: anytype, args: []const []const u8) !IshiCmd {
+    if (args.len < 2) {
+        try help(cmd, flags);
+        std.posix.exit(1);
+    }
+
+    // use tagged union to discover target command
+    const tgt_cmd = std.meta.stringToEnum(IshiCmd, args[1]) orelse {
+        try help(cmd, flags);
+        std.posix.exit(1);
+    };
+
     // Capture the concrete type of the dereferenced pointer (e.g. InitFlags).
     // This is needed so std.meta.fields can inspect its fields at comptime.
     const T = @TypeOf(flags.*);
@@ -30,8 +51,9 @@ pub fn parse(_: std.mem.Allocator, flags: anytype, args: []const []const u8) !vo
         else
             continue;
 
+        // any instance of the help flag should trigger the help usage.
         if (std.mem.eql(u8, name, help_flag)) {
-            try help(flags);
+            try help(cmd, flags);
             std.posix.exit(1);
         }
 
@@ -50,24 +72,37 @@ pub fn parse(_: std.mem.Allocator, flags: anytype, args: []const []const u8) !vo
             }
         }
     }
+
+    return tgt_cmd;
 }
 
 // Grab the nested description string for each flag and print it to the screen
 // TODO: actually implement the help trigger logic
-pub fn help(flags: anytype) !void {
+pub fn help(cmd: Cmd, flags: anytype) !void {
     const T = @TypeOf(flags.*);
 
     const usage =
         \\{s}
         \\
-        \\Usage: git ishi <command> [options]
+        \\Usage: {s}
         \\
         \\Commands:
+        \\
     ;
-    std.debug.print(usage, .{"tmp"});
+    std.debug.print(usage, .{ cmd.description, cmd.usage });
 
+    for (cmd.subcommands orelse &.{}) |sub| {
+        std.debug.print("  {s}\n", .{sub});
+    }
+
+    var flagHeaderPrinted = false;
     inline for (std.meta.fields(T)) |field| {
         if (@hasDecl(T, "descriptions")) {
+            if (!flagHeaderPrinted) {
+                std.debug.print("Flags:", .{});
+                flagHeaderPrinted = true;
+            }
+
             const desc = @field(T.descriptions, field.name);
             std.debug.print("  --{s}\t{s}\n", .{ field.name, desc });
         }
