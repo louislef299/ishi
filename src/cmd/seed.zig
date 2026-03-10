@@ -1,8 +1,9 @@
 const std = @import("std");
 const pg = @import("pg");
+const zul = @import("zul");
+
 const lib = @import("../lib/log.zig");
 const models = @import("../lib/models.zig");
-
 const root = @import("../main.zig");
 
 const SeedEntry = struct {
@@ -62,37 +63,30 @@ fn getEmbedding(allocator: std.mem.Allocator, model_name: []const u8, text: []co
     );
     defer allocator.free(body);
 
-    // Shell out to curl to call the Ollama embedding API.
-    // TODO: replace with zul.http.Client(https://www.goblgobl.com/zul/http/client/)
-    const result = try std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &.{
-            "curl",                                  "-s",
-            "-X",                                    "POST",
-            "-H",                                    "Content-Type: application/json",
-            "-d",                                    body,
-            "http://localhost:11434/api/embeddings",
-        },
-    });
-    defer allocator.free(result.stdout);
-    defer allocator.free(result.stderr);
+    // https://www.goblgobl.com/zul/http/client/
+    var client = zul.http.Client.init(allocator);
+    defer client.deinit();
 
-    if (result.term.Exited != 0) {
-        lib.log.err("curl failed: {s}", .{result.stderr});
+    var req = try client.request("http://localhost:11434/api/embeddings");
+    defer req.deinit();
+    req.method = .POST;
+    try req.header("Content-Type", "application/json");
+    req.body(body);
+
+    var res = try req.getResponse(.{});
+    if (res.status != 200) {
+        lib.log.err("client request failed", .{});
         return error.OllamaRequestFailed;
     }
 
-    // Parse the JSON response to extract the embedding array.
-    const resp = try std.json.parseFromSlice(OllamaResponse, allocator, result.stdout, .{
-        .allocate = .alloc_always,
-    });
-    defer resp.deinit();
+    const managed = try res.json(OllamaResponse, allocator, .{});
+    defer managed.deinit();
 
     // Format as a pgvector-compatible text string: "[0.1,0.2,...]"
     var vec: std.ArrayList(u8) = .empty;
     errdefer vec.deinit(allocator);
     try vec.append(allocator, '[');
-    for (resp.value.embedding, 0..) |v, i| {
+    for (managed.value.embedding, 0..) |v, i| {
         if (i > 0) try vec.append(allocator, ',');
         try vec.writer(allocator).print("{d}", .{v});
     }

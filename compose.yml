@@ -8,7 +8,9 @@ services:
     environment:
       POSTGRES_PASSWORD: ishi
     volumes:
-    - ./data:/var/lib/postgresql
+    - pgv:/var/lib/postgresql
     ports:
     - 5432:5432
 
+volumes:
+  pgv:
