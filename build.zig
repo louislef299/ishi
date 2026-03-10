@@ -15,9 +15,16 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const pg = b.dependency("pg", .{}).module("pg");
-    exe.root_module.addImport("pg", pg);
-
+    // https://github.com/karlseguin/pg.zig
+    exe.root_module.addImport(
+        "pg",
+        b.dependency("pg", .{}).module("pg"),
+    );
+    // https://github.com/karlseguin/zul
+    exe.root_module.addImport(
+        "zul",
+        b.dependency("zul", .{}).module("zul"),
+    );
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
