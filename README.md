@@ -11,6 +11,11 @@ search. The more you commit, the smarter it gets.
 - Docker / Docker Compose
 - Ollama with an embedding model pulled (`nomic-embed-text`,
   `mxbai-embed-large`, etc.)
+- (Optional) `psql`
+
+To install the dependencies with [`brew`][] leveraging the `Brewfile`, run a
+quick `brew bundle check --all -v` to verify which dependencies you are missing
+and `brew bundle install -v` to install all the dependencies.
 
 ## Setup
 
@@ -47,4 +52,5 @@ ollama run ishi
 | top\_p        | 0.9      | Conservative nucleus sampling, pairs well with low temperature        |
 
 [Black Speech of Mordor]: https://tolkiengateway.net/wiki/Black_Speech
+[`brew`]: http://louislefebvre.net/tech/brew-tips/#reproducibility-with-brewfile
 [Modelfile]: https://docs.ollama.com/modelfile
