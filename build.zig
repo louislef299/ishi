@@ -25,6 +25,13 @@ pub fn build(b: *std.Build) void {
         "zul",
         b.dependency("zul", .{}).module("zul"),
     );
+
+    // https://zighelp.org/chapter-4/ or `man ld`
+    // Zig (like any linker on Unix) automatically prepends lib to the name when
+    // searching for the file
+    exe.linkSystemLibrary("git2");
+    exe.linkLibC();
+
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
