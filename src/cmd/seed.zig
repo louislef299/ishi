@@ -14,8 +14,10 @@ const SeedEntry = struct {
 
 pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
     if (f.git) {
+        log.debug("seeding from git...", .{});
         try seedFromGit(allocator, pool, f);
     } else {
+        log.debug("seeding from json...", .{});
         try seedFromJson(allocator, pool, f);
     }
 }
@@ -41,10 +43,16 @@ fn seedFromGit(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
         std.debug.print("embedding {s}...\n", .{sha_str});
 
         // Combine commit message and diff patch for embedding.
-        const content = try std.fmt.allocPrint(allocator, "{s}\n\n{s}", .{ ci.message, ci.diff_patch });
+        // Truncate to 8192 bytes to stay within the embedding model's context window.
+        const max_embed_len: usize = 8192;
+        const patch = ci.diff_patch[0..@min(ci.diff_patch.len, max_embed_len -| ci.message.len -| 2)];
+        const content = try std.fmt.allocPrint(allocator, "{s}\n\n{s}", .{ ci.message, patch });
         defer allocator.free(content);
 
-        const embedding = try ollama.getEmbedding(allocator, f.model.name, content);
+        const embedding = ollama.getEmbedding(allocator, f.model.name, content) catch |err| {
+            log.warn("skipping {s}: {}", .{ sha_str, err });
+            continue;
+        };
         defer allocator.free(embedding);
 
         const vec_str = try pgvector.formatVector(allocator, embedding);
