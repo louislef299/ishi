@@ -24,6 +24,7 @@ pub const Config = struct {
 /// attempts fail the last error is returned to the caller.
 pub fn retry(
     comptime ResultT: type,
+    io: std.Io,
     config: Config,
     context: anytype,
     comptime requestFn: fn (@TypeOf(context)) anyerror!ResultT,
@@ -45,7 +46,11 @@ pub fn retry(
             log.warn("attempt {d}/{d} failed: {}, retrying in {d}ms...", .{
                 attempts, config.max_retries, err, backoff_ms,
             });
-            std.Thread.sleep(backoff_ms * std.time.ns_per_ms);
+            const duration: std.Io.Clock.Duration = .{
+                .raw = .fromNanoseconds(@intCast(backoff_ms * std.time.ns_per_ms)),
+                .clock = .awake,
+            };
+            duration.sleep(io) catch {};
             backoff_ms = @min(backoff_ms * config.backoff_multiplier, config.max_backoff_ms);
         }
     }
@@ -55,13 +60,13 @@ pub fn retry(
 
 test "retry succeeds on first attempt" {
     const ctx = CountingContext{ .fail_n = 0 };
-    const result = try retry(u32, .{}, ctx, CountingContext.call);
+    const result = try retry(u32, std.testing.io, .{}, ctx, CountingContext.call);
     try std.testing.expectEqual(@as(u32, 42), result);
 }
 
 test "retry succeeds after transient failures" {
     const ctx = CountingContext{ .fail_n = 2 };
-    const result = try retry(u32, .{
+    const result = try retry(u32, std.testing.io, .{
         .max_retries = 4,
         .initial_backoff_ms = 0, // no sleeping in tests
     }, ctx, CountingContext.call);
@@ -70,7 +75,7 @@ test "retry succeeds after transient failures" {
 
 test "retry returns last error when exhausted" {
     const ctx = CountingContext{ .fail_n = 10 };
-    const result = retry(u32, .{
+    const result = retry(u32, std.testing.io, .{
         .max_retries = 3,
         .initial_backoff_ms = 0,
     }, ctx, CountingContext.call);

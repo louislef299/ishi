@@ -27,7 +27,7 @@ fn seedFromGit(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
 
     const commits = git.walkCommits(allocator, ".", f.limit) catch |err| {
         log.err("Failed to walk git history: {}", .{err});
-        std.posix.exit(1);
+        std.process.exit(1);
     };
     defer {
         for (commits) |*ci| {
@@ -55,7 +55,7 @@ fn seedFromGit(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
         const content = full_content[0..@min(full_content.len, max_embed_len)];
         log.debug("Git Embedding:\t{s}", .{content});
 
-        const embedding = runner.getEmbedding(allocator, .{
+        const embedding = runner.getEmbedding(allocator, f.io, .{
             .model_name = f.model.name,
             .text = content,
             .runner = f.runner,
@@ -80,13 +80,14 @@ fn seedFromGit(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
 
 fn seedFromJson(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
     // Read the seed file from disk.
-    const seed_data = std.fs.cwd().readFileAlloc(
-        allocator,
+    const seed_data = std.Io.Dir.cwd().readFileAlloc(
+        f.io,
         f.jsonpath,
-        1024 * 1024,
+        allocator,
+        std.Io.Limit.limited(1024 * 1024),
     ) catch |err| {
         log.err("Failed to read '{s}': {}", .{ f.jsonpath, err });
-        std.posix.exit(1);
+        std.process.exit(1);
     };
     defer allocator.free(seed_data);
 
@@ -104,7 +105,7 @@ fn seedFromJson(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
         log.info("embedding '{s}'...", .{entry.id});
 
         // Call the model runner to generate the embedding vector.
-        const embedding = try runner.getEmbedding(allocator, .{
+        const embedding = try runner.getEmbedding(allocator, f.io, .{
             .model_name = f.model.name,
             .text = entry.text,
             .runner = f.runner,

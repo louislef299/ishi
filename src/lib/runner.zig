@@ -1,5 +1,4 @@
 const std = @import("std");
-const zul = @import("zul");
 
 const Runner = @import("../cmd/Flags.zig").Runner;
 pub const log = std.log.scoped(.runner);
@@ -29,6 +28,7 @@ pub const Opts = struct {
 /// function can be passed to `retry.retry` which takes `fn(Context) !T`.
 const EmbeddingContext = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     opts: Opts,
 };
 
@@ -37,24 +37,25 @@ const EmbeddingContext = struct {
 /// failures. Caller owns the returned slice.
 pub fn getEmbedding(
     allocator: std.mem.Allocator,
+    io: std.Io,
     opts: Opts,
 ) ![]f64 {
-    const ctx = EmbeddingContext{ .allocator = allocator, .opts = opts };
+    const ctx = EmbeddingContext{ .allocator = allocator, .io = io, .opts = opts };
     return switch (opts.runner) {
-        .ollama => retry.retry([]f64, .{}, ctx, attemptOllamaEmbedding),
-        .docker => retry.retry([]f64, .{}, ctx, attemptDockerEmbedding),
+        .ollama => retry.retry([]f64, io, .{}, ctx, attemptOllamaEmbedding),
+        .docker => retry.retry([]f64, io, .{}, ctx, attemptDockerEmbedding),
     };
 }
 
 fn attemptOllamaEmbedding(ctx: EmbeddingContext) anyerror![]f64 {
-    return getOllamaEmbedding(ctx.allocator, ctx.opts);
+    return getOllamaEmbedding(ctx.allocator, ctx.io, ctx.opts);
 }
 
 fn attemptDockerEmbedding(ctx: EmbeddingContext) anyerror![]f64 {
-    return getDockerEmbedding(ctx.allocator, ctx.opts);
+    return getDockerEmbedding(ctx.allocator, ctx.io, ctx.opts);
 }
 
-fn getOllamaEmbedding(allocator: std.mem.Allocator, opts: Opts) ![]f64 {
+fn getOllamaEmbedding(allocator: std.mem.Allocator, io: std.Io, opts: Opts) ![]f64 {
     const Payload = struct { model: []const u8, prompt: []const u8 };
     const body = try buildBody(allocator, Payload, .{
         .model = opts.model_name,
@@ -63,45 +64,21 @@ fn getOllamaEmbedding(allocator: std.mem.Allocator, opts: Opts) ![]f64 {
     defer allocator.free(body);
 
     const endpoint = "http://localhost:11434/api/embeddings";
+    const response_bytes = try postJson(allocator, io, endpoint, body);
+    defer allocator.free(response_bytes);
 
-    var client = zul.http.Client.init(allocator);
-    defer client.deinit();
+    const parsed = try std.json.parseFromSlice(
+        OllamaEmbeddingResponse,
+        allocator,
+        response_bytes,
+        .{ .ignore_unknown_fields = true },
+    );
+    defer parsed.deinit();
 
-    var req = client.request(endpoint) catch |err| {
-        log.err("Failed to create request for {s}: {}", .{ endpoint, err });
-        return err;
-    };
-    defer req.deinit();
-    req.method = .POST;
-    try req.header("Content-Type", "application/json");
-    req.body(body);
-
-    var res = req.getResponse(.{}) catch |err| {
-        log.err("Failed to POST to {s}: {}", .{ endpoint, err });
-        return err;
-    };
-
-    if (res.status != 200) {
-        const err_body = res.allocBody(allocator, .{ .max_size = 4096 }) catch |err| {
-            log.err("ollama request to {s} failed with status {d} (could not read body: {})", .{ endpoint, res.status, err });
-            return error.RunnerRequestFailed;
-        };
-        defer err_body.deinit();
-        log.err("ollama request to {s} failed with status {d}: {s}", .{
-            endpoint,
-            res.status,
-            err_body.string(),
-        });
-        return error.RunnerRequestFailed;
-    }
-
-    const managed = try res.json(OllamaEmbeddingResponse, allocator, .{});
-    defer managed.deinit();
-
-    return try allocator.dupe(f64, managed.value.embedding);
+    return try allocator.dupe(f64, parsed.value.embedding);
 }
 
-fn getDockerEmbedding(allocator: std.mem.Allocator, opts: Opts) ![]f64 {
+fn getDockerEmbedding(allocator: std.mem.Allocator, io: std.Io, opts: Opts) ![]f64 {
     const Payload = struct { model: []const u8, input: []const u8 };
     const body = try buildBody(allocator, Payload, .{
         .model = opts.model_name,
@@ -110,49 +87,62 @@ fn getDockerEmbedding(allocator: std.mem.Allocator, opts: Opts) ![]f64 {
     defer allocator.free(body);
 
     const endpoint = "http://localhost:12434/engines/llama.cpp/v1/embeddings";
+    const response_bytes = try postJson(allocator, io, endpoint, body);
+    defer allocator.free(response_bytes);
 
-    var client = zul.http.Client.init(allocator);
-    defer client.deinit();
+    const parsed = try std.json.parseFromSlice(
+        OpenAIEmbeddingResponse,
+        allocator,
+        response_bytes,
+        .{ .ignore_unknown_fields = true },
+    );
+    defer parsed.deinit();
 
-    var req = client.request(endpoint) catch |err| {
-        log.err("Failed to create request for {s}: {}", .{ endpoint, err });
-        return err;
-    };
-    defer req.deinit();
-    req.method = .POST;
-    try req.header("Content-Type", "application/json");
-    req.body(body);
-
-    var res = req.getResponse(.{}) catch |err| {
-        log.err("Failed to POST to {s}: {}", .{ endpoint, err });
-        return err;
-    };
-
-    if (res.status != 200) {
-        const err_body = res.allocBody(allocator, .{ .max_size = 4096 }) catch |err| {
-            log.err("docker request to {s} failed with status {d} (could not read body: {})", .{ endpoint, res.status, err });
-            return error.RunnerRequestFailed;
-        };
-        defer err_body.deinit();
-        log.err("docker request to {s} failed with status {d}: {s}", .{
-            endpoint,
-            res.status,
-            err_body.string(),
-        });
-        return error.RunnerRequestFailed;
-    }
-
-    const managed = try res.json(OpenAIEmbeddingResponse, allocator, .{
-        .ignore_unknown_fields = true,
-    });
-    defer managed.deinit();
-
-    if (managed.value.data.len == 0) {
+    if (parsed.value.data.len == 0) {
         log.err("docker response contained no embedding data", .{});
         return error.RunnerRequestFailed;
     }
 
-    return try allocator.dupe(f64, managed.value.data[0].embedding);
+    return try allocator.dupe(f64, parsed.value.data[0].embedding);
+}
+
+/// POSTs `body` as JSON to `endpoint` and returns the raw response body.
+/// Caller owns the returned slice. Returns `error.RunnerRequestFailed` on
+/// non-2xx responses (logging the status + body for diagnosis).
+fn postJson(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    endpoint: []const u8,
+    body: []const u8,
+) ![]u8 {
+    var client: std.http.Client = .{ .allocator = allocator, .io = io };
+    defer client.deinit();
+
+    var response_buf: std.Io.Writer.Allocating = .init(allocator);
+    defer response_buf.deinit();
+
+    const result = client.fetch(.{
+        .location = .{ .url = endpoint },
+        .method = .POST,
+        .payload = body,
+        .headers = .{ .content_type = .{ .override = "application/json" } },
+        .response_writer = &response_buf.writer,
+    }) catch |err| {
+        log.err("Failed to POST to {s}: {}", .{ endpoint, err });
+        return err;
+    };
+
+    const status_int = @intFromEnum(result.status);
+    if (status_int < 200 or status_int >= 300) {
+        log.err("request to {s} failed with status {d}: {s}", .{
+            endpoint,
+            status_int,
+            response_buf.written(),
+        });
+        return error.RunnerRequestFailed;
+    }
+
+    return response_buf.toOwnedSlice();
 }
 
 /// Serializes a struct value to a JSON byte string. Caller owns the result.

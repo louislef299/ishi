@@ -32,21 +32,19 @@ pub const std_options: std.Options = .{
     .log_level = .info,
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
-    const f = try Flags.init(allocator);
+    const f = try Flags.init(allocator, init);
     defer f.deinit();
 
-    var pool = pg.Pool.init(allocator, .{
+    var pool = pg.Pool.init(init.io, allocator, .{
         .size = 1,
         .connect = .{ .host = f.target, .port = 5432 },
         .auth = .{ .username = f.username, .password = f.password, .database = f.database },
     }) catch |err| {
         log.err("Failed to connect to {s}(is the db running?): {}", .{ f.target, err });
-        std.posix.exit(1);
+        std.process.exit(1);
     };
     defer pool.deinit();
 
