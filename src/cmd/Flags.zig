@@ -31,6 +31,7 @@ git: bool,
 limit: usize,
 runner: Runner,
 allocator: std.mem.Allocator,
+io: std.Io,
 
 pub fn deinit(self: Flags) void {
     self.allocator.free(self.target);
@@ -65,23 +66,22 @@ pub const usage =
     \\  --runner      local model runner to use (default: docker)
 ;
 
-pub fn init(allocator: std.mem.Allocator) !Flags {
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+pub fn init(allocator: std.mem.Allocator, process_init: std.process.Init) !Flags {
+    const args = try process_init.minimal.args.toSlice(process_init.arena.allocator());
 
     if (args.len < 2) {
         help();
-        std.posix.exit(1);
+        std.process.exit(1);
     }
 
     if (std.mem.eql(u8, args[1], "--help")) {
         help();
-        std.posix.exit(0);
+        std.process.exit(0);
     }
 
     const cmd = std.meta.stringToEnum(IshiCmd, args[1]) orelse {
         help();
-        std.posix.exit(1);
+        std.process.exit(1);
     };
 
     // Parse --key value pairs and boolean flags from args[2..]
@@ -101,7 +101,7 @@ pub fn init(allocator: std.mem.Allocator) !Flags {
         const arg = args[i];
         if (std.mem.eql(u8, arg, "--help")) {
             help();
-            std.posix.exit(0);
+            std.process.exit(0);
         } else if (std.mem.eql(u8, arg, "--git")) {
             git = true;
         } else if (std.mem.eql(u8, arg, "--target")) {
@@ -127,7 +127,7 @@ pub fn init(allocator: std.mem.Allocator) !Flags {
             if (i < args.len) {
                 limit = std.fmt.parseInt(usize, args[i], 10) catch {
                     log.err("Invalid --limit value '{s}'", .{args[i]});
-                    std.posix.exit(1);
+                    std.process.exit(1);
                 };
             }
         } else if (std.mem.eql(u8, arg, "--runner")) {
@@ -135,7 +135,7 @@ pub fn init(allocator: std.mem.Allocator) !Flags {
             if (i < args.len) {
                 runner = std.meta.stringToEnum(Runner, args[i]) orelse {
                     log.err("Unknown runner '{s}'. Supported: docker, ollama", .{args[i]});
-                    std.posix.exit(1);
+                    std.process.exit(1);
                 };
             }
         } else {
@@ -151,14 +151,14 @@ pub fn init(allocator: std.mem.Allocator) !Flags {
     // that returns a result, except it shares the surrounding scope.
     const mod = models.find(model_name) orelse blk: {
         // Model not in static list — probe the runner for dimensions.
-        const embedding = runner_mod.getEmbedding(allocator, .{
+        const embedding = runner_mod.getEmbedding(allocator, process_init.io, .{
             .text = "probe",
             .model_name = model_name,
             .runner = runner,
         }) catch {
             log.err("Unknown model '{s}' and probe failed. Known models:", .{model_name});
             for (models.models) |m| log.err("  {s}", .{m.name});
-            std.posix.exit(1);
+            std.process.exit(1);
         };
         defer allocator.free(embedding);
         log.debug("probed '{s}': {d} dims", .{ model_name, embedding.len });
@@ -187,6 +187,7 @@ pub fn init(allocator: std.mem.Allocator) !Flags {
         .limit = limit,
         .allocator = allocator,
         .runner = runner,
+        .io = process_init.io,
     };
 }
 

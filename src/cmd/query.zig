@@ -9,13 +9,13 @@ const Flags = @import("Flags.zig");
 pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
     if (f.query.len == 0) {
         log.err("query text is required: ishi query \"your question here\"", .{});
-        std.posix.exit(1);
+        std.process.exit(1);
     }
 
     std.debug.print("querying: \"{s}\"\n\n", .{f.query});
 
     // Embed the query text via the model runner.
-    const embedding = try runner.getEmbedding(allocator, .{
+    const embedding = try runner.getEmbedding(allocator, f.io, .{
         .model_name = f.model.name,
         .text = f.query,
         .runner = f.runner,

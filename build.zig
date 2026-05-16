@@ -12,6 +12,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         }),
     });
 
@@ -20,17 +21,11 @@ pub fn build(b: *std.Build) void {
         "pg",
         b.dependency("pg", .{}).module("pg"),
     );
-    // https://github.com/karlseguin/zul
-    exe.root_module.addImport(
-        "zul",
-        b.dependency("zul", .{}).module("zul"),
-    );
 
     // https://zighelp.org/chapter-4/ or `man ld`
     // Zig (like any linker on Unix) automatically prepends lib to the name when
     // searching for the file
-    exe.linkSystemLibrary("git2");
-    exe.linkLibC();
+    exe.root_module.linkSystemLibrary("git2", .{});
 
     b.installArtifact(exe);
 

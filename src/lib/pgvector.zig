@@ -8,7 +8,9 @@ pub fn formatVector(allocator: std.mem.Allocator, embedding: []const f64) ![]u8 
     try vec.append(allocator, '[');
     for (embedding, 0..) |v, i| {
         if (i > 0) try vec.append(allocator, ',');
-        try vec.writer(allocator).print("{d}", .{v});
+        const s = try std.fmt.allocPrint(allocator, "{d}", .{v});
+        defer allocator.free(s);
+        try vec.appendSlice(allocator, s);
     }
     try vec.append(allocator, ']');
     return try vec.toOwnedSlice(allocator);

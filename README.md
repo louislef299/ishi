@@ -7,7 +7,7 @@ search. The more you commit, the smarter it gets.
 
 ## Prerequisites
 
-- Zig (0.15.2)
+- Zig (0.16.0)
 - Docker Desktop (with [Model Runner][] enabled)
 - (Optional) Ollama — alternative model runner (`--runner ollama`)
 - (Optional) `psql`
