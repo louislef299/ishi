@@ -15,7 +15,7 @@ RUN apk add --no-cache build-base libgit2-dev go \
 
 WORKDIR /app
 COPY . .
-RUN zig build
+RUN --mount=type=cache,target=/root/.cache/zig zig build
 
 CMD [ "/app/zig-out/bin/ishi", "init", \
     "--target", "vdb", "--git", \
