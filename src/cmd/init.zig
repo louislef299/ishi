@@ -17,16 +17,22 @@ const table =
     \\ commit_date TIMESTAMPTZ,
     \\ files_changed INT,
     \\ insertions INT,
-    \\ deletions INT);
+    \\ deletions INT,
+    \\ textsearch tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED);
+;
+
+const textsearch_index =
+    \\CREATE INDEX IF NOT EXISTS items_textsearch_idx ON items USING GIN (textsearch);
 ;
 
 pub fn run(_: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
     _ = try pool.exec("CREATE EXTENSION IF NOT EXISTS vector;", .{});
 
     // DDL cannot use query parameters — build the SQL on the stack.
-    var buf: [512]u8 = undefined;
+    var buf: [1024]u8 = undefined;
     const create_table = try std.fmt.bufPrint(&buf, table, .{f.model.dims});
     _ = try pool.exec(create_table, .{});
+    _ = try pool.exec(textsearch_index, .{});
 
     std.debug.print("initialized for model '{s}' ({d} dims)\n", .{
         f.model.name, f.model.dims,
