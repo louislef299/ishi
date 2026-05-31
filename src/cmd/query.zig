@@ -1,12 +1,17 @@
 const std = @import("std");
-const pg = @import("pg");
 
 pub const log = std.log.scoped(.query);
 const runner = @import("../lib/runner.zig");
-const pgvector = @import("../lib/pgvector.zig");
+const rrf = @import("../lib/rrf.zig");
+const store = @import("../lib/store.zig");
 const Flags = @import("Flags.zig");
 
-pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
+/// How many candidates to pull from each arm before fusing.
+const candidates_per_arm = 20;
+/// How many fused results to print.
+const max_results = 3;
+
+pub fn run(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
     if (f.query.len == 0) {
         log.err("query text is required: ishi query \"your question here\"", .{});
         std.process.exit(1);
@@ -22,42 +27,30 @@ pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
     });
     defer allocator.free(embedding);
 
-    // Format as pgvector-compatible string.
-    const vec_str = try pgvector.formatVector(allocator, embedding);
-    defer allocator.free(vec_str);
-
-    // Hybrid search: combine vector (cosine) and BM25 (tsvector) results
-    // via Reciprocal Rank Fusion. k=60 follows the pgvector README default.
-    var result = try pool.query(
-        \\WITH semantic_search AS (
-        \\    SELECT id, RANK() OVER (ORDER BY embedding <=> $1::vector) AS rank
-        \\    FROM items ORDER BY embedding <=> $1::vector LIMIT 20
-        \\),
-        \\keyword_search AS (
-        \\    SELECT id, RANK() OVER (ORDER BY ts_rank_cd(textsearch, query) DESC) AS rank
-        \\    FROM items, plainto_tsquery('english', $2) query
-        \\    WHERE textsearch @@ query
-        \\    ORDER BY ts_rank_cd(textsearch, query) DESC LIMIT 20
-        \\)
-        \\SELECT i.content,
-        \\       COALESCE(1.0 / (60 + ss.rank), 0.0)
-        \\     + COALESCE(1.0 / (60 + ks.rank), 0.0) AS score
-        \\FROM semantic_search ss
-        \\FULL OUTER JOIN keyword_search ks ON ss.id = ks.id
-        \\JOIN items i ON i.id = COALESCE(ss.id, ks.id)
-        \\ORDER BY score DESC LIMIT 3
-    , .{ vec_str, f.query });
-    defer result.deinit();
-
-    var rank: u8 = 1;
-    while (try result.next()) |row| {
-        const content = try row.get([]const u8, 0);
-        const score = try row.get(f64, 1);
-        std.debug.print("{d}. ({d:.4}) {s}\n", .{ rank, score, content });
-        rank += 1;
+    // Two arms — semantic (vector) and keyword (lexical) — fused with RRF.
+    const vec_hits = try db.vectorSearch(allocator, embedding, candidates_per_arm);
+    defer {
+        for (vec_hits) |h| allocator.free(h.content);
+        allocator.free(vec_hits);
     }
 
-    if (rank == 1) {
+    const kw_hits = try db.keywordSearch(allocator, f.query, candidates_per_arm);
+    defer {
+        for (kw_hits) |h| allocator.free(h.content);
+        allocator.free(kw_hits);
+    }
+
+    // `fused` borrows content from the arms above, so it must be freed first
+    // (declared last → freed first under LIFO defers) and printed before them.
+    const fused = try rrf.fuse(allocator, &.{ vec_hits, kw_hits }, rrf.default_k);
+    defer allocator.free(fused);
+
+    const limit = @min(@as(usize, max_results), fused.len);
+    for (fused[0..limit], 1..) |result, rank| {
+        std.debug.print("{d}. ({d:.4}) {s}\n", .{ rank, result.score, result.content });
+    }
+
+    if (fused.len == 0) {
         std.debug.print("no results found. have you run 'ishi seed' yet?\n", .{});
     }
 }
