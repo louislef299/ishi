@@ -181,6 +181,8 @@ fn collect(allocator: std.mem.Allocator, result: anytype) ![]Hit {
 const testing = std.testing;
 
 test "integration: upsert then vector + keyword search round-trip" {
+    if (!@import("build_options").integration) return error.SkipZigTest;
+
     const allocator = testing.allocator;
 
     const dims: u16 = 768;

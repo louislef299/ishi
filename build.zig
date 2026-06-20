@@ -11,6 +11,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const integration = b.option(
+        bool,
+        "integration",
+        "Run integration tests that require external services (e.g. Postgres)",
+    ) orelse false;
+
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "integration", integration);
+
     const exe = b.addExecutable(.{
         .name = "ishi",
         .root_module = b.createModule(.{
@@ -31,6 +40,8 @@ pub fn build(b: *std.Build) void {
     // Zig (like any linker on Unix) automatically prepends lib to the name when
     // searching for the file
     exe.root_module.linkSystemLibrary("git2", .{});
+
+    exe.root_module.addOptions("build_options", build_options);
 
     b.installArtifact(exe);
 
