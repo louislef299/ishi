@@ -1,10 +1,9 @@
 const std = @import("std");
-const pg = @import("pg");
 
 pub const log = std.log.scoped(.seed);
 const git = @import("../lib/git.zig");
 const runner = @import("../lib/runner.zig");
-const pgvector = @import("../lib/pgvector.zig");
+const store = @import("../lib/store.zig");
 const Flags = @import("Flags.zig");
 
 const SeedEntry = struct {
@@ -12,17 +11,17 @@ const SeedEntry = struct {
     text: []const u8,
 };
 
-pub fn run(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
+pub fn run(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
     if (f.jsonpath.len == 0) {
         log.debug("seeding from git...", .{});
-        try seedFromGit(allocator, pool, f);
+        try seedFromGit(allocator, db, f);
     } else {
         log.debug("seeding from json...", .{});
-        try seedFromJson(allocator, pool, f);
+        try seedFromJson(allocator, db, f);
     }
 }
 
-fn seedFromGit(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
+fn seedFromGit(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
     log.info("Walking up to {d} commits...", .{f.limit});
 
     const commits = git.walkCommits(allocator, ".", f.limit) catch |err| {
@@ -65,20 +64,25 @@ fn seedFromGit(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
         };
         defer allocator.free(embedding);
 
-        const vec_str = try pgvector.formatVector(allocator, embedding);
-        defer allocator.free(vec_str);
-
-        // pg.zig Timestamp expects microseconds; libgit2 gives seconds.
-        const commit_date_us = ci.author_date * 1_000_000;
-        _ = try pool.exec(
-            "INSERT INTO items (sha, content, embedding, author_name, author_email, commit_date, files_changed, insertions, deletions) VALUES ($1, $2, $3::vector, $4, $5, $6, $7, $8, $9) ON CONFLICT (sha) DO NOTHING",
-            .{ sha_str, content, vec_str, ci.author_name, ci.author_email, commit_date_us, ci.files_changed, ci.insertions, ci.deletions },
-        );
+        try db.upsert(.{
+            .sha = ci.sha[0..],
+            .content = content,
+            .embedding = embedding,
+            .meta = .{
+                .author_name = ci.author_name,
+                .author_email = ci.author_email,
+                // Stored as microseconds; libgit2 reports seconds.
+                .commit_date_us = ci.author_date * 1_000_000,
+                .files_changed = @intCast(ci.files_changed),
+                .insertions = @intCast(ci.insertions),
+                .deletions = @intCast(ci.deletions),
+            },
+        });
         log.info("  seeded {s}", .{sha_str});
     }
 }
 
-fn seedFromJson(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
+fn seedFromJson(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
     // Read the seed file from disk.
     const seed_data = std.Io.Dir.cwd().readFileAlloc(
         f.io,
@@ -95,9 +99,7 @@ fn seedFromJson(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
         []SeedEntry,
         allocator,
         seed_data,
-        .{
-            .allocate = .alloc_always,
-        },
+        .{ .allocate = .alloc_always },
     );
     defer parsed.deinit();
 
@@ -112,14 +114,7 @@ fn seedFromJson(allocator: std.mem.Allocator, pool: *pg.Pool, f: Flags) !void {
         });
         defer allocator.free(embedding);
 
-        // Format as a pgvector-compatible text string: "[0.1,0.2,...]"
-        const vec_str = try pgvector.formatVector(allocator, embedding);
-        defer allocator.free(vec_str);
-
-        _ = try pool.exec(
-            "INSERT INTO items (content, embedding) VALUES ($1, $2::vector)",
-            .{ entry.text, vec_str },
-        );
+        try db.upsert(.{ .content = entry.text, .embedding = embedding });
         log.info("  seeded '{s}'", .{entry.id});
     }
 }
