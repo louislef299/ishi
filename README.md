@@ -41,26 +41,3 @@ Ollama instead, pass `--runner ollama` and pull the model yourself:
 ollama pull nomic-embed-text
 ./zig-out/bin/ishi seed --runner ollama --model nomic-embed-text --git
 ```
-
-ishi also ships with a [Modelfile][] that creates a local LLM tuned for
-answering questions about your codebase using context from the vector database.
-You can pull the Modelfile from GHCR with [ORAS][] or use the one in the repo:
-
-```sh
-oras pull ghcr.io/louislef299/ishi:latest
-ollama create ishi -f ./Modelfile
-ollama run ishi
-```
-
-| Parameter     | Value    | Rationale   |
-|---------------|----------|------------ |
-| Base model    | llama3.2 | 3B params, fast local inference, strong instruction-following         |
-| temperature   | 0.3      | Low creativity -- favors factual, grounded answers over hallucination |
-| num\_ctx      | 4096     | Room for system prompt + retrieved context + question + response      |
-| top\_p        | 0.9      | Conservative nucleus sampling, pairs well with low temperature        |
-
-[Black Speech of Mordor]: https://tolkiengateway.net/wiki/Black_Speech
-[`brew`]: http://louislefebvre.net/tech/brew-tips/#reproducibility-with-brewfile
-[Model Runner]: https://docs.docker.com/desktop/features/model-runner/
-[Modelfile]: https://docs.ollama.com/modelfile
-[ORAS]: https://oras.land/
