@@ -20,8 +20,8 @@ Run `zig build --fetch` if remote Zig dependencies have not been fetched yet.
 
 ## Conventions
 
-- New `.zig` source files must include the Apache 2.0 copyright header
-  (see `src/main.zig` lines 1-13 for the exact text).
+- `.zig` source files do not carry a per-file license header; the project is
+  MIT-licensed via the root `LICENSE` file.
 
 ## Gotchas
 
