@@ -12,24 +12,22 @@ search. The more you commit, the smarter it gets.
 - (Optional) Ollama — alternative model runner (`--runner ollama`)
 - (Optional) `psql`
 
-To install the dependencies with [`brew`][] leveraging the `Brewfile`, run a
+To install the dependencies with `brew` leveraging the `Brewfile`, run a
 quick `brew bundle check --all -v` to verify which dependencies you are missing
 and `brew bundle install -v` to install all the dependencies.
 
-## Setup
+## Try It Out
 
 ```sh
-docker compose up -d   # starts pgvector + pulls the embedding model
+# start pgvector, pull the embedding model &
+# run ishi init during startup
+docker compose up -d
+
 zig build
-```
 
-## Usage
-
-```sh
-./zig-out/bin/ishi init
-./zig-out/bin/ishi seed --path src/seed.json
-./zig-out/bin/ishi query "what is comptime?"
 ./zig-out/bin/ishi --help
+./zig-out/bin/ishi seed
+./zig-out/bin/ishi query "what is comptime?"
 ```
 
 ## Ollama (alternative runner)
