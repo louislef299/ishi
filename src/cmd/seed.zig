@@ -12,13 +12,8 @@ const SeedEntry = struct {
 };
 
 pub fn run(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
-    if (f.jsonpath.len == 0) {
-        log.debug("seeding from git...", .{});
-        try seedFromGit(allocator, db, f);
-    } else {
-        log.debug("seeding from json...", .{});
-        try seedFromJson(allocator, db, f);
-    }
+    log.debug("seeding from git...", .{});
+    try seedFromGit(allocator, db, f);
 }
 
 fn seedFromGit(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
@@ -79,42 +74,5 @@ fn seedFromGit(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
             },
         });
         log.info("  seeded {s}", .{sha_str});
-    }
-}
-
-fn seedFromJson(allocator: std.mem.Allocator, db: store.Store, f: Flags) !void {
-    // Read the seed file from disk.
-    const seed_data = std.Io.Dir.cwd().readFileAlloc(
-        f.io,
-        f.jsonpath,
-        allocator,
-        std.Io.Limit.limited(1024 * 1024),
-    ) catch |err| {
-        log.err("Failed to read '{s}': {}", .{ f.jsonpath, err });
-        std.process.exit(1);
-    };
-    defer allocator.free(seed_data);
-
-    const parsed = try std.json.parseFromSlice(
-        []SeedEntry,
-        allocator,
-        seed_data,
-        .{ .allocate = .alloc_always },
-    );
-    defer parsed.deinit();
-
-    for (parsed.value) |entry| {
-        log.info("embedding '{s}'...", .{entry.id});
-
-        // Call the model runner to generate the embedding vector.
-        const embedding = try runner.getEmbedding(allocator, f.io, .{
-            .model_name = f.model.name,
-            .text = entry.text,
-            .runner = f.runner,
-        });
-        defer allocator.free(embedding);
-
-        try db.upsert(.{ .content = entry.text, .embedding = embedding });
-        log.info("  seeded '{s}'", .{entry.id});
     }
 }

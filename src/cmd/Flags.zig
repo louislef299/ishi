@@ -25,9 +25,7 @@ username: []const u8,
 password: []const u8,
 database: []const u8,
 model: Model,
-jsonpath: []const u8,
 query: []const u8,
-git: bool,
 limit: usize,
 runner: Runner,
 allocator: std.mem.Allocator,
@@ -39,7 +37,6 @@ pub fn deinit(self: Flags) void {
     self.allocator.free(self.password);
     self.allocator.free(self.database);
     self.allocator.free(self.model.name);
-    self.allocator.free(self.jsonpath);
     if (self.query.len > 0) self.allocator.free(self.query);
 }
 
@@ -60,8 +57,6 @@ pub const usage =
     \\  --password    pg password (default: ishi)
     \\  --database    pg database (default: postgres)
     \\  --model       ollama embedding model (default: ai/nomic-embed-text-v1.5)
-    \\  --jsonpath    path to JSON file to seed from (not git)
-    \\  --git         force seed from git commit history (default seed strategy)
     \\  --limit       max commits to ingest with --git (default: 50)
     \\  --runner      local model runner to use (default: docker)
 ;
@@ -90,9 +85,7 @@ pub fn init(allocator: std.mem.Allocator, process_init: std.process.Init) !Flags
     var password: []const u8 = "ishi";
     var database: []const u8 = "postgres";
     var model_name: []const u8 = "ai/nomic-embed-text-v1.5";
-    var jsonpath: []const u8 = "";
     var query: []const u8 = "";
-    var git = false;
     var limit: usize = 50;
     var runner: Runner = Runner.docker;
 
@@ -102,8 +95,6 @@ pub fn init(allocator: std.mem.Allocator, process_init: std.process.Init) !Flags
         if (std.mem.eql(u8, arg, "--help")) {
             help();
             std.process.exit(0);
-        } else if (std.mem.eql(u8, arg, "--git")) {
-            git = true;
         } else if (std.mem.eql(u8, arg, "--target")) {
             i += 1;
             target = if (i < args.len) args[i] else target;
@@ -119,9 +110,6 @@ pub fn init(allocator: std.mem.Allocator, process_init: std.process.Init) !Flags
         } else if (std.mem.eql(u8, arg, "--model")) {
             i += 1;
             model_name = if (i < args.len) args[i] else model_name;
-        } else if (std.mem.eql(u8, arg, "--jsonpath")) {
-            i += 1;
-            jsonpath = if (i < args.len) args[i] else jsonpath;
         } else if (std.mem.eql(u8, arg, "--limit")) {
             i += 1;
             if (i < args.len) {
@@ -181,9 +169,7 @@ pub fn init(allocator: std.mem.Allocator, process_init: std.process.Init) !Flags
             .name = try allocator.dupe(u8, mod.name),
             .dims = mod.dims,
         },
-        .jsonpath = try allocator.dupe(u8, jsonpath),
         .query = if (query.len > 0) try allocator.dupe(u8, query) else "",
-        .git = git,
         .limit = limit,
         .allocator = allocator,
         .runner = runner,
