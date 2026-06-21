@@ -62,6 +62,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/unit_tests.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         }),
         .filters = b.args orelse &.{},
     });
