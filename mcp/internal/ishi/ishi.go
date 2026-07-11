@@ -34,7 +34,7 @@ func New() (*Client, error) {
 // If the command exits non-zero, it returns an error wrapping stderr.
 func (c *Client) Run(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, c.binPath, args...)
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

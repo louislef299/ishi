@@ -6,10 +6,10 @@ package version
 var (
 	// Version is the semantic version string (e.g., "v0.1.0", "v0.1.0-3-gabcdef").
 	Version = "dev"
-	
+
 	// Commit is the git commit SHA.
 	Commit = "unknown"
-	
+
 	// Date is the build date.
 	Date = "unknown"
 )

@@ -92,7 +92,7 @@ func TestParse_FlagsOverrideEnv(t *testing.T) {
 
 	// Set flag (should override env).
 	os.Args = []string{"test", "--target=flag-host"}
-	
+
 	cfg, err := Parse()
 	if err != nil {
 		t.Fatalf("Parse() failed: %v", err)

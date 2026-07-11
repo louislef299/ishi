@@ -12,7 +12,7 @@ import (
 func TestNew_ResolvesFromPath(t *testing.T) {
 	// Use 'echo' as a stand-in since ishi may not be built yet.
 	t.Setenv("ISHI_BIN", "")
-	
+
 	// Temporarily add a directory with a mock 'ishi' to PATH.
 	mockScript := createMockScript(t, `#!/bin/sh
 echo "mock ishi"
@@ -22,10 +22,10 @@ echo "mock ishi"
 	if err := os.Rename(mockScript, mockBin); err != nil {
 		t.Fatalf("failed to rename mock script: %v", err)
 	}
-	
+
 	oldPath := os.Getenv("PATH")
 	t.Setenv("PATH", mockDir+":"+oldPath)
-	
+
 	client, err := New()
 	if err != nil {
 		t.Fatalf("New() failed: %v", err)
