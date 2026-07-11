@@ -3,4 +3,6 @@ zig-out/
 .zig-cache/
 bin/
 zig-pkg/
-bin/
+
+# Go build artifacts
+mcp/bin/
